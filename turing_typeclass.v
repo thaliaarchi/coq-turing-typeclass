@@ -2,21 +2,20 @@ Require Import List. Import ListNotations.
 
 (** * Coq typeclass resolution is Turing-complete
 
+    by Thalia Archibald, 15 Apr 2023
+
     To resolve a typeclass instance, Coq performs an unrestricted proof search
     for a satisfying instance. This proof search can be seen as the trace of a
     program execution and when no such instance exists, the search diverges.
-    This indicates it should be Turing-complete! Let's prove it!
-
-    (The source code for this tutorial is at
-    #<a href="https://github.com/thaliaarchi/coq-turing-typeclass">github.com/thaliaarchi/coq-turing-typeclass</a>#.) *)
+    This indicates it should be Turing-complete! Let's prove it! *)
 
 (** ** Typeclasses
 
     A typeclass is essentially an interface associated with a type.
 
     In Coq, [`{Tc}] is syntax for a typeclass constraint and is equivalent to
-    [{A : Type} {I : Tc}], that is, "[A] is some type, such that an instance [I]
-    of typeclass [Tc] exists for [A]". For example, the typeclass [InjTyp T U]
+    [{A : Type} {I : Tc}], that is, “[A] is some type, such that an instance [I]
+    of typeclass [Tc] exists for [A]”. For example, the typeclass [InjTyp T U]
     in the standard library represents a conversion from some type [T] to some
     type [U]. Proofs with linear integer arithmetic use
     [{T : Type} `{InjTyp T Z}] to convert from some type [T] to the built-in
@@ -29,29 +28,30 @@ Require Import List. Import ListNotations.
     in other languages. This is what makes it Turing-complete.
 
     For a more in-depth tutorial on typeclasses, see the
-    #<a href="https://softwarefoundations.cis.upenn.edu/qc-current/Typeclasses.html">Typeclasses</a>#
-    chapter in the fantastic Software Foundations series. The section on
-    non-termination and the advice from experts are particularly relevant to
-    this. *)
+    #<a href="https://softwarefoundations.cis.upenn.edu/qc-current/Typeclasses.html">
+    Typeclasses</a># chapter in the fantastic Software Foundations series. The
+    section on non-termination and the advice from experts are particularly
+    relevant to this. *)
 
 (** ** Smallfuck
 
     To prove Turing-completeness, it is sufficient to implement a
     Turing-complete language.
 
-    I model the semantics of #<a href="https://esolangs.org/wiki/Smallfuck">Smallfuck</a>#,
-    a subset of Brainfuck, using typeclass instances. Smallfuck has a tape of
-    bits and can move the cell pointer left or right, flip the current cell, and
-    loop. I/O and a more complex cell type are not needed to demonstrate
-    Turing-completeness, but you could see how that would be modelled in my
-    #<a href="https://github.com/thaliaarchi/bfcoq">bfcoq</a># project. *)
+    I model the semantics of #<a href="https://esolangs.org/wiki/Smallfuck">
+    Smallfuck</a>#, a subset of Brainfuck, using typeclass instances. Smallfuck
+    has a tape of bits and can move the cell pointer left or right, flip the
+    current cell, and loop. I/O and a more complex cell type are not needed to
+    demonstrate Turing-completeness, but you could see how that would be
+    modelled in my #<a href="https://github.com/thaliaarchi/bfcoq">bfcoq</a>#
+    project. *)
 
 (** [prog] represents a Smallfuck program:
 
     - [PRight] ([>]) moves the tape right
     - [PLeft] ([<]) moves the tape left
     - [PFlip] ([*]) flips the current cell
-    - [PLoop] ([[...]]) repeats while the current cell is 1
+    - [PLoop] ([[…]]) repeats while the current cell is 1
     - [PEnd] is a no-op used at the end of a loop or program *)
 
 Inductive prog : Type :=
@@ -187,7 +187,7 @@ Definition exec_loop_r_nonterm
   `{E : Exec (PRight (PFlip (PLoop (PRight (PFlip PEnd)) PEnd)))} := E.
 Fail Timeout 1 Check exec_loop_r_nonterm.
 
-(** And finally, a program that writes "Hallo, Welt!" in binary to the tape,
+(** And finally, a program that writes “Hallo, Welt!” in binary to the tape,
     [>*>>>*>>>>>*>*>>>>>*>>*>*>>*>*>>>>*>*>>*>*>>>>*>*>>*>*>*>*>>>*>>*>*>>>
     >>*>>>>>>>*>>*>>*>*>*>>*>*>>>*>>*>>*>*>>*>*>>>>*>*>*>>*>>>>>*>>>>>*>]: *)
 
@@ -214,3 +214,13 @@ Definition exec_hworld
              ))))))))))))))))))))))))))))))))) (Tape 0 [] [])} := E.
 Check exec_hworld.
 Compute rev exec_hworld.(exec).(ltape).
+
+(** Thanks for reading!
+
+    You can find the source code for this tutorial at
+    #<a href="https://github.com/thaliaarchi/coq-turing-typeclass">
+    github.com/thaliaarchi/coq-turing-typeclass</a>#.
+
+    For more Turing-complete subsets of programming languages, see my
+    compilation #<a href="https://github.com/thaliaarchi/notes/blob/main/topics/unexpected_turing.md">
+    “Unexpectedly Turing-complete”</a>#. *)
