@@ -1,8 +1,10 @@
 # Coq typeclass resolution is Turing-complete
 
-To resolve a typeclass instance, Coq performs an unrestricted proof search for a
-satisfying instance. This proof search can be seen as the trace of a program
-execution and, when no such instance exists, it diverges. This indicates it
+The Coq theorem prover has a powerful means of abstraction, typeclasses. To
+resolve a typeclass instance, the typechecker performs an unrestricted search
+for an instance satisfying those constraints. The steps in this search resemble
+the trace of a program execution, and, crucially, it is possible to express
+unsatisfiable constraints, which cause an infinite search. This indicates it
 should be Turing-complete! Let's prove it!
 
 In this tutorial, I implement Smallfuck using only typeclass instance resolution
