@@ -217,6 +217,8 @@ Compute rev exec_hworld.(exec).(ltape).
 
 (** Thanks for reading!
 
+    To my knowledge, this is the first proof of its Turing-completeness.
+
     You can find the source code for this tutorial at
     #<a href="https://github.com/thaliaarchi/coq-turing-typeclass">
     github.com/thaliaarchi/coq-turing-typeclass</a>#.
