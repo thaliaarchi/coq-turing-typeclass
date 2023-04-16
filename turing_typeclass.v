@@ -5,10 +5,11 @@ Require Import List. Import ListNotations.
     by Thalia Archibald, 15 Apr 2023
 
     The Coq theorem prover has a powerful means of abstraction, typeclasses. To
-    resolve a typeclass instance, Coq performs an unrestricted proof search for
-    a satisfying instance. This proof search can be seen as the trace of a
-    program execution and, when no such instance exists, it diverges. This
-    indicates it should be Turing-complete! Let's prove it! *)
+    resolve a typeclass instance, the typechecker performs an unrestricted
+    search for an instance satisfying those constraints. The steps in this
+    search resemble the trace of a program execution, and, crucially, it is
+    possible to express unsatisfiable constraints, which cause an infinite
+    search. This indicates it should be Turing-complete! Let's prove it! *)
 
 (** ** Background on typeclasses
 
@@ -67,7 +68,7 @@ Record tape : Type := Tape {
 Local Notation "0" := false.
 Local Notation "1" := true.
 
-(** ** Small-step semantics
+(** ** Big-step semantics
 
     To execute a Smallfuck program, we map an initial tape to a final tape. I
     model this as a typeclass [Exec], that takes a program [p] and initial and
@@ -148,6 +149,37 @@ Class Exec (p : prog) (t t' : tape) : Type := {
   `{Exec (PLoop b p) t' t''} :
   Exec (PLoop b p) (Tape 1 lt rt) t'' := {}.
 
+(** For comparison, this closely resembles a typical relational definition in
+    Coq, where [Exec] becomes the type signature and each instance becomes a
+    variant. However, a relation cannot solve for the final tape, like the next
+    section shows with typeclasses. *)
+
+Inductive exec_rel : prog -> tape -> tape -> Prop :=
+  | ExecRel_Right_cons p c lt rc rt t' :
+      exec_rel p (Tape rc (c :: lt) rt) t' ->
+      exec_rel (PRight p) (Tape c lt (rc :: rt)) t'
+  | ExecRel_Right_nil p c lt t' :
+      exec_rel p (Tape 0 (c :: lt) []) t' ->
+      exec_rel (PRight p) (Tape c lt []) t'
+  | ExecRel_Left_cons p c lc lt rt t' :
+      exec_rel p (Tape lc lt (c :: rt)) t' ->
+      exec_rel (PLeft p) (Tape c (lc :: lt) rt) t'
+  | ExecRel_Left_nil p c rt t' :
+      exec_rel p (Tape 0 [] (c :: rt)) t' ->
+      exec_rel (PLeft p) (Tape c [] rt) t'
+  | ExecRel_Flip p c lt rt t' :
+      exec_rel p (Tape (negb c) lt rt) t' ->
+      exec_rel (PFlip p) (Tape c lt rt) t'
+  | ExecRel_Loop_0 b p lt rt t' :
+      exec_rel p (Tape 0 lt rt) t' ->
+      exec_rel (PLoop b p) (Tape 0 lt rt) t'
+  | ExecRel_Loop_1 b p lt rt t' t'' :
+      exec_rel b (Tape 1 lt rt) t' ->
+      exec_rel (PLoop b p) t' t'' ->
+      exec_rel (PLoop b p) (Tape 1 lt rt) t''
+  | ExecRel_End t :
+      exec_rel PEnd t t.
+
 (** ** Execution
 
     Now let's execute programs by typechecking! First, enable typeclass
@@ -189,7 +221,9 @@ Check exec_rr_back (Tape 0 [] [1]).
 
     Each iteration of the loop generates for a fresh intermediate value for the
     tape, which ensures a revisited state will not resolve to the same
-    instance. *)
+    instance. When no instance can ever satisfy it, which happens for
+    non-terminating programs, the typechecker will infinitely expand the
+    constraints and diverge. *)
 
 Definition exec_loop_nonterm
   `{E : Exec (PLoop PEnd PEnd) (Tape 1 [] [])} := E.

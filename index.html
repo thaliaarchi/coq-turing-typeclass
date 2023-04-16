@@ -33,10 +33,11 @@
 <div class="paragraph"> </div>
 
     The Coq theorem prover has a powerful means of abstraction, typeclasses. To
-    resolve a typeclass instance, Coq performs an unrestricted proof search for
-    a satisfying instance. This proof search can be seen as the trace of a
-    program execution and, when no such instance exists, it diverges. This
-    indicates it should be Turing-complete! Let's prove it!
+    resolve a typeclass instance, the typechecker performs an unrestricted
+    search for an instance satisfying those constraints. The steps in this
+    search resemble the trace of a program execution, and, crucially, it is
+    possible to express unsatisfiable constraints, which cause an infinite
+    search. This indicates it should be Turing-complete! Let's prove it!
 <div class="paragraph"> </div>
 
 <a id="lab2"></a><h2 class="section">Background on typeclasses</h2>
@@ -145,7 +146,7 @@ Let's define a shorthand for booleans.
 </div>
 
 <div class="doc">
-<a id="lab4"></a><h2 class="section">Small-step semantics</h2>
+<a id="lab4"></a><h2 class="section">Big-step semantics</h2>
 
 
 <div class="paragraph"> </div>
@@ -283,6 +284,44 @@ Finally, <span class="inlinecode"><span class="id" title="var">PLoop</span></spa
 </div>
 
 <div class="doc">
+For comparison, this closely resembles a typical relational definition in
+    Coq, where <span class="inlinecode"><span class="id" title="var">Exec</span></span> becomes the type signature and each instance becomes a
+    variant. However, a relation cannot solve for the final tape, like the next
+    section shows with typeclasses.
+</div>
+<div class="code">
+
+<br/>
+<span class="id" title="keyword">Inductive</span> <span class="id" title="var">exec_rel</span> : <span class="id" title="var">prog</span> → <span class="id" title="var">tape</span> → <span class="id" title="var">tape</span> → <span class="id" title="keyword">Prop</span> :=<br/>
+&nbsp;&nbsp;| <span class="id" title="var">ExecRel_Right_cons</span> <span class="id" title="var">p</span> <span class="id" title="var">c</span> <span class="id" title="var">lt</span> <span class="id" title="var">rc</span> <span class="id" title="var">rt</span> <span class="id" title="var">t'</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">exec_rel</span> <span class="id" title="var">p</span> (<span class="id" title="var">Tape</span> <span class="id" title="var">rc</span> (<span class="id" title="var">c</span> :: <span class="id" title="var">lt</span>) <span class="id" title="var">rt</span>) <span class="id" title="var">t'</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">exec_rel</span> (<span class="id" title="var">PRight</span> <span class="id" title="var">p</span>) (<span class="id" title="var">Tape</span> <span class="id" title="var">c</span> <span class="id" title="var">lt</span> (<span class="id" title="var">rc</span> :: <span class="id" title="var">rt</span>)) <span class="id" title="var">t'</span><br/>
+&nbsp;&nbsp;| <span class="id" title="var">ExecRel_Right_nil</span> <span class="id" title="var">p</span> <span class="id" title="var">c</span> <span class="id" title="var">lt</span> <span class="id" title="var">t'</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">exec_rel</span> <span class="id" title="var">p</span> (<span class="id" title="var">Tape</span> 0 (<span class="id" title="var">c</span> :: <span class="id" title="var">lt</span>) []) <span class="id" title="var">t'</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">exec_rel</span> (<span class="id" title="var">PRight</span> <span class="id" title="var">p</span>) (<span class="id" title="var">Tape</span> <span class="id" title="var">c</span> <span class="id" title="var">lt</span> []) <span class="id" title="var">t'</span><br/>
+&nbsp;&nbsp;| <span class="id" title="var">ExecRel_Left_cons</span> <span class="id" title="var">p</span> <span class="id" title="var">c</span> <span class="id" title="var">lc</span> <span class="id" title="var">lt</span> <span class="id" title="var">rt</span> <span class="id" title="var">t'</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">exec_rel</span> <span class="id" title="var">p</span> (<span class="id" title="var">Tape</span> <span class="id" title="var">lc</span> <span class="id" title="var">lt</span> (<span class="id" title="var">c</span> :: <span class="id" title="var">rt</span>)) <span class="id" title="var">t'</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">exec_rel</span> (<span class="id" title="var">PLeft</span> <span class="id" title="var">p</span>) (<span class="id" title="var">Tape</span> <span class="id" title="var">c</span> (<span class="id" title="var">lc</span> :: <span class="id" title="var">lt</span>) <span class="id" title="var">rt</span>) <span class="id" title="var">t'</span><br/>
+&nbsp;&nbsp;| <span class="id" title="var">ExecRel_Left_nil</span> <span class="id" title="var">p</span> <span class="id" title="var">c</span> <span class="id" title="var">rt</span> <span class="id" title="var">t'</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">exec_rel</span> <span class="id" title="var">p</span> (<span class="id" title="var">Tape</span> 0 [] (<span class="id" title="var">c</span> :: <span class="id" title="var">rt</span>)) <span class="id" title="var">t'</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">exec_rel</span> (<span class="id" title="var">PLeft</span> <span class="id" title="var">p</span>) (<span class="id" title="var">Tape</span> <span class="id" title="var">c</span> [] <span class="id" title="var">rt</span>) <span class="id" title="var">t'</span><br/>
+&nbsp;&nbsp;| <span class="id" title="var">ExecRel_Flip</span> <span class="id" title="var">p</span> <span class="id" title="var">c</span> <span class="id" title="var">lt</span> <span class="id" title="var">rt</span> <span class="id" title="var">t'</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">exec_rel</span> <span class="id" title="var">p</span> (<span class="id" title="var">Tape</span> (<span class="id" title="var">negb</span> <span class="id" title="var">c</span>) <span class="id" title="var">lt</span> <span class="id" title="var">rt</span>) <span class="id" title="var">t'</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">exec_rel</span> (<span class="id" title="var">PFlip</span> <span class="id" title="var">p</span>) (<span class="id" title="var">Tape</span> <span class="id" title="var">c</span> <span class="id" title="var">lt</span> <span class="id" title="var">rt</span>) <span class="id" title="var">t'</span><br/>
+&nbsp;&nbsp;| <span class="id" title="var">ExecRel_Loop_0</span> <span class="id" title="var">b</span> <span class="id" title="var">p</span> <span class="id" title="var">lt</span> <span class="id" title="var">rt</span> <span class="id" title="var">t'</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">exec_rel</span> <span class="id" title="var">p</span> (<span class="id" title="var">Tape</span> 0 <span class="id" title="var">lt</span> <span class="id" title="var">rt</span>) <span class="id" title="var">t'</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">exec_rel</span> (<span class="id" title="var">PLoop</span> <span class="id" title="var">b</span> <span class="id" title="var">p</span>) (<span class="id" title="var">Tape</span> 0 <span class="id" title="var">lt</span> <span class="id" title="var">rt</span>) <span class="id" title="var">t'</span><br/>
+&nbsp;&nbsp;| <span class="id" title="var">ExecRel_Loop_1</span> <span class="id" title="var">b</span> <span class="id" title="var">p</span> <span class="id" title="var">lt</span> <span class="id" title="var">rt</span> <span class="id" title="var">t'</span> <span class="id" title="var">t''</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">exec_rel</span> <span class="id" title="var">b</span> (<span class="id" title="var">Tape</span> 1 <span class="id" title="var">lt</span> <span class="id" title="var">rt</span>) <span class="id" title="var">t'</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">exec_rel</span> (<span class="id" title="var">PLoop</span> <span class="id" title="var">b</span> <span class="id" title="var">p</span>) <span class="id" title="var">t'</span> <span class="id" title="var">t''</span> →<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">exec_rel</span> (<span class="id" title="var">PLoop</span> <span class="id" title="var">b</span> <span class="id" title="var">p</span>) (<span class="id" title="var">Tape</span> 1 <span class="id" title="var">lt</span> <span class="id" title="var">rt</span>) <span class="id" title="var">t''</span><br/>
+&nbsp;&nbsp;| <span class="id" title="var">ExecRel_End</span> <span class="id" title="var">t</span> :<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="id" title="var">exec_rel</span> <span class="id" title="var">PEnd</span> <span class="id" title="var">t</span> <span class="id" title="var">t</span>.<br/>
+
+<br/>
+</div>
+
+<div class="doc">
 <a id="lab5"></a><h2 class="section">Execution</h2>
 
 
@@ -364,7 +403,9 @@ Non-terminating programs like <span class="inlinecode">[]</span> and <span class
 
     Each iteration of the loop generates for a fresh intermediate value for the
     tape, which ensures a revisited state will not resolve to the same
-    instance.
+    instance. When no instance can ever satisfy it, which happens for
+    non-terminating programs, the typechecker will infinitely expand the
+    constraints and diverge.
 </div>
 <div class="code">
 
