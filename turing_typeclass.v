@@ -4,28 +4,20 @@ Require Import List. Import ListNotations.
 
     by Thalia Archibald, 15 Apr 2023
 
-    To resolve a typeclass instance, Coq performs an unrestricted proof search
-    for a satisfying instance. This proof search can be seen as the trace of a
-    program execution and when no such instance exists, the search diverges.
-    This indicates it should be Turing-complete! Let's prove it! *)
+    The Coq theorem prover has a powerful means of abstraction, typeclasses. To
+    resolve a typeclass instance, Coq performs an unrestricted proof search for
+    a satisfying instance. This proof search can be seen as the trace of a
+    program execution and, when no such instance exists, it diverges. This
+    indicates it should be Turing-complete! Let's prove it! *)
 
-(** ** Typeclasses
+(** ** Background on typeclasses
 
     A typeclass is essentially an interface associated with a type.
 
-    In Coq, [`{Tc}] is syntax for a typeclass constraint and is equivalent to
-    [{A : Type} {I : Tc}], that is, “[A] is some type, such that an instance [I]
-    of typeclass [Tc] exists for [A]”. For example, the typeclass [InjTyp T U]
-    in the standard library represents a conversion from some type [T] to some
-    type [U]. Proofs with linear integer arithmetic use
-    [{T : Type} `{InjTyp T Z}] to convert from some type [T] to the built-in
-    signed integer type [Z].
-
     Typeclasses were first introduced in Haskell and have since been adopted by
-    many other languages, including in Rust as traits. However, because Coq is
-    dependently-typed, its typeclass constraints can also contain arbitrary
-    types and values, making making it strictly more powerful than typeclasses
-    in other languages. This is what makes it Turing-complete.
+    many other languages, including in Rust as traits. With its richer dependent
+    types, Coq further extends typeclasses to allow for values in constraints.
+    This allows for computation to be mixed with the search for an instance.
 
     For a more in-depth tutorial on typeclasses, see the
     #<a href="https://softwarefoundations.cis.upenn.edu/qc-current/Typeclasses.html">
@@ -58,7 +50,7 @@ Inductive prog : Type :=
   | PRight (next : prog)
   | PLeft (next : prog)
   | PFlip (next : prog)
-  | PLoop (body : prog) (next : prog)
+  | PLoop (body next : prog)
   | PEnd.
 
 (** [tape] is an infinite tape, where [cell] is the current cell and [ltape] and
@@ -77,29 +69,42 @@ Local Notation "1" := true.
 
 (** ** Small-step semantics
 
-    To execute a Smallfuck program, we map an initial tape to a final tape. That
-    can be modeled as a typeclass [Exec], that takes a program [p] and initial
-    and final tapes [t] and [t'], and provides a function [exec] that returns
-    [t']. *)
+    To execute a Smallfuck program, we map an initial tape to a final tape. I
+    model this as a typeclass [Exec], that takes a program [p] and initial and
+    final tapes [t] and [t']. It has a function [exec] that returns [t'], so it
+    can be used.
+
+    Notice that it is parameterized over _values_ [p], [t], and [t'], not types.
+    Other languages only allow types as generic parameters, but Coq generalizes
+    it to any dependently-typed term, values and types. *)
 
 Class Exec (p : prog) (t t' : tape) : Type := {
   exec := t';
 }.
 
 (** I then define instances of [Exec] for each operation in big-step semantics
-    style.
+    style. These define the transformations to be performed in each case, and
+    can be seen as a pattern matching at the instance level.
 
     [PEnd] is the simplest to model; it takes a tape [t] and maps it to
-    itself. *)
+    itself (does nothing). Syntactically, this defines an instance named
+    [Exec_End], that satisfies [Exec] for the program [PEnd] and some tape [t]
+    for both the initial and final tape. *)
 
 #[export] Instance Exec_End t :
   Exec PEnd t t := {}.
 
 (** [PFlip] negates the current cell.
 
-    Intuitively, this definition states that if an instance of [Exec] exists for
-    the rest of the program, starting with the flipped tape and producing some
-    tape [t'], then we can apply [PFlip]. *)
+    Intuitively, this definition states that if the remainder of the program can
+    be executed, then we can also execute [PFlip]. That is, if it can resolve an
+    instance for the program starting after applying the flip, then it will
+    supply an instance for the flip. This order is backwards, because it applies
+    the operations post-order in a depth-first search.
+
+    The parameter [`{Exec p t t'}] is a class constraint, which implicitly
+    supplies evidence that [p t t'] has an instance of [Exec]. It is equivalent
+    to [{E : Exec p t t'}], but where the name is not used. *)
 
 #[export] Instance Exec_Flip p c lt rt t'
   `{Exec p (Tape (negb c) lt rt) t'} :
@@ -107,7 +112,10 @@ Class Exec (p : prog) (t t' : tape) : Type := {
 
 (** [PRight] has two cases: When the tape has at least one cell to the left,
     shift that cell to the current and the old current to the right. When the
-    left tape is empty, use [0] as the new current cell. *)
+    left tape is empty, use [0] as the new current cell.
+
+    Here, we destructure [Tape], so we can cover the cases of [[]] and
+    [_ :: _]. *)
 
 #[export] Instance Exec_Right_cons p c lt rc rt t'
   `{Exec p (Tape rc (c :: lt) rt) t'} :
@@ -126,9 +134,11 @@ Class Exec (p : prog) (t t' : tape) : Type := {
   Exec (PLeft p) (Tape c [] rt) t' := {}.
 
 (** Finally, [PLoop] has two cases: When the current cell is [0], skip the body
-    and execute the next instruction. When the current cell is [1], execute the
-    body, then repeat the loop. [Exec_Loop_1] requires two instances, for
-    executing the body once and for executing the loop again. *)
+    and execute the next operation. When the current cell is [1], execute the
+    body, then repeat the loop.
+
+    [Exec_Loop_1] requires two instances, for executing the body once and for
+    executing the loop again. *)
 
 #[export] Instance Exec_Loop_0 b p lt rt t'
   `{Exec p (Tape 0 lt rt) t'} :
@@ -149,13 +159,15 @@ Set Typeclasses Debug.
     [11(0)1]: *)
 
 Definition exec_right_verify
-  `{E : Exec (PRight PEnd) (Tape 1 [1] [0; 1]) (Tape 0 [1; 1] [1])} := E.
+  `{E : Exec (PRight PEnd) (Tape 1 [1] [0; 1])
+                           (Tape 0 [1; 1] [1])} := E.
 Check exec_right_verify.
 
 (** However, give it an impossible result and it cannot find an instance: *)
 
 Definition exec_right_bad
-  `{E : Exec (PRight PEnd) (Tape 1 [1] [0; 1]) (Tape 0 [] [])} := E.
+  `{E : Exec (PRight PEnd) (Tape 1 [1] [0; 1])
+                           (Tape 0 [] [])} := E.
 Check exec_right_bad.
 
 (** More usefully, we can generalize it to any tape [t] and let it infer the
@@ -215,9 +227,10 @@ Definition exec_hworld
 Check exec_hworld.
 Compute rev exec_hworld.(exec).(ltape).
 
-(** Thanks for reading!
+(** ** Conclusion
 
-    To my knowledge, this is the first proof of its Turing-completeness.
+    To my knowledge, this is the first proof of the Turing-completeness of
+    typeclass resolution in Coq.
 
     You can find the source code for this tutorial at
     #<a href="https://github.com/thaliaarchi/coq-turing-typeclass">
@@ -225,4 +238,6 @@ Compute rev exec_hworld.(exec).(ltape).
 
     For more Turing-complete subsets of programming languages, see my
     compilation #<a href="https://github.com/thaliaarchi/notes/blob/main/topics/unexpected_turing.md">
-    “Unexpectedly Turing-complete”</a>#. *)
+    “Unexpectedly Turing-complete”</a>#.
+
+    Thanks for reading! *)
